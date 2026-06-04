@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Notification } from 'electron'
+import { app, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { createTray, updateTrayStatus, destroyTray } from './tray'
 import { startHotkey, stopHotkey, HOTKEY_MAP, captureKey } from './hotkey'
@@ -144,14 +144,6 @@ async function stopRecording(): Promise<void> {
   if (finalText && finalText.trim()) {
     console.log(`[main] 最终结果: "${finalText}"`)
     await pasteText(finalText)
-
-    const config = getConfig()
-    if (config.notification) {
-      new Notification({
-        title: 'VoicePipe',
-        body: `已粘贴：${finalText.length > 50 ? finalText.slice(0, 50) + '...' : finalText}`,
-      }).show()
-    }
   } else {
     console.log('[main] 无识别结果')
   }
