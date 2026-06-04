@@ -3,7 +3,7 @@
 html, body {
   width: 100%;
   height: 100%;
-  background: transparent;
+  background: #16213e;
   overflow: hidden;
   user-select: none;
   -webkit-app-region: no-drag;
@@ -15,30 +15,25 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(22, 33, 62, 0.92);
-  border-radius: 16px;
-  border: 1px solid rgba(78, 204, 163, 0.25);
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4),
-              0 0 0 1px rgba(78, 204, 163, 0.08);
-  padding: 0 20px;
-  animation: fadeIn 0.15s ease-out;
+  background: #16213e;
+  animation: fadeIn 0.12s ease-out;
 }
 
 #indicator.fade-out {
-  animation: fadeOut 0.2s ease-in forwards;
+  animation: fadeOut 0.18s ease-in forwards;
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 @keyframes fadeOut {
-  from { opacity: 1; transform: translateY(0); }
-  to   { opacity: 0; transform: translateY(-6px); }
+  from { opacity: 1; }
+  to   { opacity: 0; }
 }
 
-#waveform-canvas {
+#waveform-svg {
   width: 100%;
   height: 100%;
 }
@@ -52,13 +47,13 @@ html, body {
   gap: 8px;
   color: #f39c12;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
 }
 
 .spinner {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   border: 2px solid rgba(243, 156, 18, 0.3);
   border-top-color: #f39c12;
   border-radius: 50%;

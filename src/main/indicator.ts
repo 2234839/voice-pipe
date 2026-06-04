@@ -4,34 +4,53 @@ import { join } from 'path'
 /** 指示器窗口实例 */
 let indicatorWindow: BrowserWindow | null = null
 
+/** 创建计数器（调试用） */
+let createCount = 0
+
 /** 显示录音指示器窗口 */
 export function showIndicator(): void {
-  if (indicatorWindow) return
+  createCount++
+  console.log(`[indicator] showIndicator 调用 #${createCount}, 现有窗口: ${indicatorWindow ? '存在(id=' + indicatorWindow.id + ')' : 'null'}`)
+
+  if (indicatorWindow) {
+    console.log('[indicator] 窗口已存在，跳过创建')
+    return
+  }
+
+  console.log('[indicator] 创建指示器窗口')
 
   const primaryDisplay = screen.getPrimaryDisplay()
   const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize
 
-  const winWidth = 280
-  const winHeight = 72
+  const winWidth = 200
+  const winHeight = 48
 
   indicatorWindow = new BrowserWindow({
     width: winWidth,
     height: winHeight,
     x: Math.round((screenWidth - winWidth) / 2),
-    y: Math.round(screenHeight - winHeight - 80),
+    y: Math.round(screenHeight - winHeight - 60),
     frame: false,
-    transparent: true,
+    transparent: false,
     resizable: false,
     alwaysOnTop: true,
     skipTaskbar: true,
     focusable: false,
     show: false,
     hasShadow: false,
+    backgroundColor: '#16213e',
     webPreferences: {
       preload: join(__dirname, '../preload/indicator.js'),
       contextIsolation: true,
       nodeIntegration: false,
     },
+  })
+
+  console.log(`[indicator] 窗口已创建, id=${indicatorWindow.id}`)
+
+  // 捕获指示器窗口的 console 输出到主进程日志（必须在 loadURL/loadFile 之前注册）
+  indicatorWindow.webContents.on('console-message', (_event, _level, message) => {
+    console.log(`[indicator-renderer] ${message}`)
   })
 
   // Windows 上设置为 screen-saver 级别确保始终置顶
@@ -40,10 +59,16 @@ export function showIndicator(): void {
   }
 
   indicatorWindow.once('ready-to-show', () => {
+    console.log(`[indicator] 窗口就绪, id=${indicatorWindow?.id}`)
     indicatorWindow?.showInactive()
   })
 
+  indicatorWindow.webContents.on('did-finish-load', () => {
+    console.log(`[indicator] 页面加载完成, id=${indicatorWindow?.id}`)
+  })
+
   indicatorWindow.on('closed', () => {
+    console.log(`[indicator] 窗口已关闭`)
     indicatorWindow = null
   })
 
@@ -54,13 +79,14 @@ export function showIndicator(): void {
   }
 }
 
-/** 隐藏录音指示器窗口（带淡出动画） */
-export async function hideIndicator(): Promise<void> {
-  if (!indicatorWindow) return
-  // 通知指示器播放消失动画
-  indicatorWindow.webContents.send('indicator-status', 'idle')
-  await new Promise(resolve => setTimeout(resolve, 200))
-  indicatorWindow?.close()
+/** 隐藏录音指示器窗口 */
+export function hideIndicator(): void {
+  if (!indicatorWindow) {
+    console.log('[indicator] hideIndicator: 没有窗口需要隐藏')
+    return
+  }
+  console.log(`[indicator] 隐藏窗口, id=${indicatorWindow.id}`)
+  indicatorWindow.close()
   indicatorWindow = null
 }
 
@@ -69,9 +95,16 @@ export function getIndicatorWindow(): BrowserWindow | null {
   return indicatorWindow
 }
 
+/** 波形数据发送计数（调试用） */
+let waveformSendCount = 0
+
 /** 向指示器窗口发送波形数据 */
 export function sendWaveformToIndicator(data: number[]): void {
   if (!indicatorWindow) return
+  waveformSendCount++
+  if (waveformSendCount <= 5) {
+    console.log(`[indicator] 发送波形数据 #${waveformSendCount} 到窗口 id=${indicatorWindow.id}, isLoading=${indicatorWindow.webContents.isLoading()}`)
+  }
   indicatorWindow.webContents.send('waveform-data', data)
 }
 

@@ -40,10 +40,15 @@ export function keycodeToName(keycode: number): string | undefined {
 let onKeyDown: KeyCallback | null = null
 let onKeyUp: KeyCallback | null = null
 
+/** 当前快捷键是否处于按下状态（防止 keydown/keyup 重复触发） */
+let keyIsDown = false
+
 /** 监听 keydown 事件 */
 function handleKeyDown(event: UiohookKeyboardEvent): void {
   const hotkey = HOTKEY_MAP[get('hotkey')] ?? UiohookKey.AltRight
   if (event.keycode !== hotkey) return
+  if (keyIsDown) return
+  keyIsDown = true
   console.log(`[hotkey] keydown: ${CODE_TO_NAME[event.keycode] ?? event.keycode}`)
   onKeyDown?.()
 }
@@ -52,6 +57,8 @@ function handleKeyDown(event: UiohookKeyboardEvent): void {
 function handleKeyUp(event: UiohookKeyboardEvent): void {
   const hotkey = HOTKEY_MAP[get('hotkey')] ?? UiohookKey.AltRight
   if (event.keycode !== hotkey) return
+  if (!keyIsDown) return
+  keyIsDown = false
   console.log(`[hotkey] keyup: ${CODE_TO_NAME[event.keycode] ?? event.keycode}`)
   onKeyUp?.()
 }

@@ -12,6 +12,18 @@ import { showIndicator, hideIndicator, sendWaveformToIndicator, sendStatusToIndi
 app.disableHardwareAcceleration()
 app.commandLine.appendSwitch('no-sandbox')
 
+/** 单实例锁：禁止同时运行多个 VoicePipe */
+const gotTheLock = app.requestSingleInstanceLock()
+if (!gotTheLock) {
+  app.quit()
+} else {
+  // 第二个实例启动时，聚焦已有实例的主窗口
+  app.on('second-instance', () => {
+    mainWindow?.show()
+    mainWindow?.focus()
+  })
+}
+
 /** 将 console.log/write 重定向到日志文件，方便排查闪退 */
 const logFile = join(app.getPath('temp'), 'voicepipe-debug.log')
 const logStream = require('fs').createWriteStream(logFile, { flags: 'w' })
@@ -50,6 +62,7 @@ function createWindow(): BrowserWindow {
     height: 420,
     show: true,
     autoHideMenuBar: true,
+    title: 'VoicePipe',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
@@ -79,6 +92,7 @@ function createWindow(): BrowserWindow {
 
 /** 切换状态 */
 function setState(newState: AppState): void {
+  console.log(`[main] setState: ${state} -> ${newState}`)
   state = newState
   updateTrayStatus(newState)
   mainWindow?.webContents.send('status-change', newState)
@@ -89,7 +103,7 @@ function setState(newState: AppState): void {
   } else if (newState === 'processing') {
     sendStatusToIndicator('processing')
   } else if (newState === 'idle') {
-    hideIndicator()
+    void hideIndicator()
   }
 }
 
@@ -218,7 +232,12 @@ function registerIpc(): void {
   })
 
   // 波形数据：主窗口渲染进程 → 指示器窗口
+  let waveformCount = 0
   ipcMain.on('waveform-data', (_event, data: number[]) => {
+    waveformCount++
+    if (waveformCount <= 5) {
+      console.log(`[main] 收到波形数据 #${waveformCount}: ${data.length} samples`)
+    }
     sendWaveformToIndicator(data)
   })
 
@@ -283,7 +302,9 @@ app.whenReady().then(() => {
   console.log('[main] VoicePipe 已启动')
 })
 
-// 所有窗口关闭时不退出（托盘模式）
+// 主窗口关闭时退出应用
 app.on('window-all-closed', () => {
-  // 托盘模式：不退出应用
+  stopHotkey()
+  destroyTray()
+  app.quit()
 })

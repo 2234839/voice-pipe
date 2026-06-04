@@ -1,95 +1,96 @@
-/** 声纹绘制：对称柱状波形风格（类似 Siri） */
+/** SVG 声纹波形渲染器 — 纯 DOM，不依赖 Canvas/GPU */
 
-/** 平滑系数（越大越平滑） */
-const SMOOTHING = 0.3
+/** 柱子数量（与 AudioWorklet 输出的波形样本数一致） */
+const BAR_COUNT = 64
 
-/** 柱子数量 */
-const BAR_COUNT = 32
+/** 平滑系数（越大越平滑，0.7 表示 70% 保留旧值 + 30% 新值） */
+const SMOOTHING = 0.7
 
 /** 历史平滑数据 */
 let smoothedData: Float32Array | null = null
 
+/** SVG 柱子元素缓存 */
+let barElements: SVGRectElement[] = []
+
+/** SVG viewBox 尺寸 */
+const SVG_WIDTH = 200
+const SVG_HEIGHT = 48
+
 /**
- * 绘制声纹波形
- * 将 Float32Array 时域数据降采样为 32 根对称柱状波形
+ * 初始化 SVG 波形容器
  */
-export function drawWaveform(canvas: HTMLCanvasElement, rawData: Float32Array): void {
-  const ctx = canvas.getContext('2d')
-  if (!ctx) return
-
-  // 自适应尺寸
-  const parent = canvas.parentElement
-  if (parent) {
-    canvas.width = parent.clientWidth * devicePixelRatio
-    canvas.height = parent.clientHeight * devicePixelRatio
-    ctx.scale(devicePixelRatio, devicePixelRatio)
-  }
-
-  const width = canvas.width / devicePixelRatio
-  const height = canvas.height / devicePixelRatio
-
-  // 降采样：每 BAR_COUNT 个区间取平均振幅
-  const samplesPerBar = Math.floor(rawData.length / BAR_COUNT)
-  const bars: number[] = []
+export function initWaveform(container: SVGSVGElement): void {
+  container.setAttribute('viewBox', `0 0 ${SVG_WIDTH} ${SVG_HEIGHT}`)
+  container.setAttribute('preserveAspectRatio', 'none')
+  container.innerHTML = ''
+  barElements = []
 
   for (let i = 0; i < BAR_COUNT; i++) {
-    let sum = 0
-    for (let j = 0; j < samplesPerBar; j++) {
-      sum += Math.abs(rawData[i * samplesPerBar + j])
-    }
-    bars.push(sum / samplesPerBar)
+    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect')
+    rect.setAttribute('fill', '#4ecca3')
+    rect.setAttribute('rx', '1')
+    barElements.push(rect)
+    container.appendChild(rect)
   }
 
-  // 平滑处理：避免波形跳动太剧烈
-  if (!smoothedData || smoothedData.length !== BAR_COUNT) {
+  // 初始化所有柱子为最小高度
+  updateBars(new Float32Array(BAR_COUNT))
+}
+
+/**
+ * 更新波形
+ * rawData 直接来自 AudioWorklet，长度 = BAR_COUNT
+ */
+export function updateWaveform(
+  container: SVGSVGElement,
+  rawData: Float32Array
+): void {
+  // 确保柱子元素已创建
+  if (barElements.length !== BAR_COUNT) {
+    initWaveform(container)
+  }
+
+  // 取绝对值作为振幅
+  const bars = new Float32Array(rawData.length)
+  for (let i = 0; i < rawData.length; i++) {
+    bars[i] = Math.abs(rawData[i])
+  }
+
+  // 平滑
+  if (!smoothedData || smoothedData.length !== bars.length) {
     smoothedData = new Float32Array(bars)
   } else {
-    for (let i = 0; i < BAR_COUNT; i++) {
+    for (let i = 0; i < bars.length; i++) {
       smoothedData[i] = smoothedData[i] * SMOOTHING + bars[i] * (1 - SMOOTHING)
     }
   }
 
-  // 清除画布
-  ctx.clearRect(0, 0, width, height)
-
-  // 绘制对称柱状波形
-  const barWidth = (width * 0.8) / BAR_COUNT
-  const gap = (width * 0.2) / (BAR_COUNT - 1)
-  const startX = (width - (barWidth + gap) * BAR_COUNT + gap) / 2
-  const centerY = height / 2
-  const maxBarHeight = height * 0.4
-
-  for (let i = 0; i < BAR_COUNT; i++) {
-    const amplitude = smoothedData[i]
-    const barHeight = Math.min(Math.max(2, amplitude * maxBarHeight * 5), maxBarHeight)
-
-    const x = startX + i * (barWidth + gap)
-
-    // 渐变色：中心淡、两端浓
-    const gradient = ctx.createLinearGradient(x, centerY - barHeight, x, centerY + barHeight)
-    gradient.addColorStop(0, 'rgba(78, 204, 163, 0.9)')
-    gradient.addColorStop(0.5, 'rgba(78, 204, 163, 0.6)')
-    gradient.addColorStop(1, 'rgba(78, 204, 163, 0.9)')
-
-    ctx.fillStyle = gradient
-    ctx.beginPath()
-    const radius = barWidth / 2
-    roundedRect(ctx, x, centerY - barHeight, barWidth, barHeight * 2, radius)
-    ctx.fill()
-  }
+  updateBars(smoothedData)
 }
 
-/** 圆角矩形路径 */
-function roundedRect(
-  ctx: CanvasRenderingContext2D,
-  x: number, y: number,
-  w: number, h: number, r: number
-): void {
-  r = Math.min(r, w / 2, h / 2)
-  ctx.moveTo(x + r, y)
-  ctx.arcTo(x + w, y, x + w, y + h, r)
-  ctx.arcTo(x + w, y + h, x, y + h, r)
-  ctx.arcTo(x, y + h, x, y, r)
-  ctx.arcTo(x, y, x + w, y, r)
-  ctx.closePath()
+/** 更新 SVG 柱子位置和大小 */
+function updateBars(data: Float32Array): void {
+  const count = data.length
+  const totalBarWidth = SVG_WIDTH * 0.92
+  const barWidth = totalBarWidth / count * 0.65
+  const gap = totalBarWidth / count * 0.35
+  const startX = (SVG_WIDTH - totalBarWidth) / 2
+  const centerY = SVG_HEIGHT / 2
+  const maxBarHeight = SVG_HEIGHT * 0.42
+
+  for (let i = 0; i < count; i++) {
+    const amplitude = data[i]
+    const barHeight = Math.min(Math.max(0.5, amplitude * maxBarHeight * 60), maxBarHeight)
+    const x = startX + i * (barWidth + gap)
+
+    const rect = barElements[i]
+    rect.setAttribute('x', String(x))
+    rect.setAttribute('y', String(centerY - barHeight))
+    rect.setAttribute('width', String(barWidth))
+    rect.setAttribute('height', String(barHeight * 2))
+
+    const distFromCenter = Math.abs(i - count / 2) / (count / 2)
+    const opacity = 0.4 + 0.6 * (1 - distFromCenter)
+    rect.setAttribute('fill-opacity', String(opacity.toFixed(2)))
+  }
 }
