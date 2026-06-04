@@ -1,0 +1,10 @@
+{
+  "app_name": "VoicePipe",
+  "tray_tooltip": "VoicePipe — 语音输入",
+  "status_idle": "就绪 — 按住 RightAlt 开始说话",
+  "status_recording": "录音中...",
+  "status_processing": "识别中...",
+  "notification_success": "已粘贴：{text}",
+  "notification_error": "识别失败，请重试",
+  "hotkey_hint": "按住 RightAlt 说话，松开粘贴"
+}

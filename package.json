@@ -1,0 +1,34 @@
+{
+  "name": "voice-pipe",
+  "version": "0.1.0",
+  "description": "Windows 语音输入工具 — 按住快捷键说话，松开自动粘贴文字",
+  "main": "./out/main/index.js",
+  "private": true,
+  "scripts": {
+    "dev": "ELECTRON_RUN_AS_NODE= electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "pack:win": "electron-vite build && node scripts/pack.js",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json"
+  },
+  "dependencies": {
+    "uiohook-napi": "^1.5.5",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@electron/rebuild": "^3.7.0",
+    "@types/node": "^25.9.1",
+    "@types/ws": "^8.18.0",
+    "electron": "^35.0.0",
+    "electron-builder": "^26.0.0",
+    "electron-vite": "^3.0.0",
+    "typescript": "^5.8.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "electron",
+      "esbuild",
+      "uiohook-napi"
+    ]
+  }
+}

@@ -1,0 +1,25 @@
+appId: com.voicepipe.app
+productName: VoicePipe
+directories:
+  buildResources: resources
+files:
+  - out/**/*
+  - "!out/renderer/**/*"
+extraResources:
+  - from: resources/
+    to: resources/
+asar: true
+asarUnpack:
+  - '**/*.node'
+  - 'resources/**'
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+    - target: zip
+      arch: [x64]
+  icon: resources/icon.ico
+nsis:
+  oneClick: true
+  allowToChangeInstallationDirectory: false
+npmRebuild: false
