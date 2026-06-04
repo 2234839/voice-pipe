@@ -17,6 +17,8 @@ function init(): void {
   // 音频回调
   audioCapture.setWaveformCallback((data) => {
     drawWaveform(data)
+    // 转发波形数据给主进程，由主进程转发给指示器窗口
+    window.voicePipe.sendWaveformData(Array.from(data))
   })
 
   audioCapture.setPcmChunkCallback((chunk) => {

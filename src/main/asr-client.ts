@@ -52,9 +52,9 @@ export class AsrStreamClient extends EventEmitter {
       this.ws.on('open', () => {
         console.log('[asr] 已连接')
 
-        // 发送控制消息：online 模式
+        // 发送控制消息：2pass 模式（实时 + 句尾离线纠错）
         const controlMsg = JSON.stringify({
-          mode: 'online',
+          mode: '2pass',
           chunk_size: [5, 10, 5],
           chunk_interval: 10,
           encoder_chunk_look_back: 4,
@@ -83,8 +83,9 @@ export class AsrStreamClient extends EventEmitter {
         const raw = Buffer.isBuffer(data) ? data.toString('utf8') : String(data)
         const msg: FunASRMessage = JSON.parse(raw)
         const isFinal = msg.is_final ?? false
-        console.log(`[asr] 收到文本 (is_final=${isFinal}): "${msg.text}"`)
-        this.emit('text', msg.text ?? '', isFinal)
+        const mode = msg.mode ?? ''
+        console.log(`[asr] 收到文本 (mode=${mode}, is_final=${isFinal}): "${msg.text}"`)
+        this.emit('text', msg.text ?? '', isFinal, mode)
 
         if (isFinal) {
           this.settled = true

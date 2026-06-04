@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'" />
+  <title>VoicePipe Indicator</title>
+  <link rel="stylesheet" href="./indicator/style.css" />
+</head>
+<body>
+  <div id="indicator">
+    <canvas id="waveform-canvas"></canvas>
+    <div id="processing-label" class="hidden">
+      <div class="spinner"></div>
+      <span>识别中...</span>
+    </div>
+  </div>
+  <script type="module" src="./indicator/main.ts"></script>
+</body>
+</html>

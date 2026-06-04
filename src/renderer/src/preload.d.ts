@@ -26,10 +26,21 @@ export interface VoicePipeAPI {
   getSupportedHotkeys: () => Promise<string[]>
   /** 主进程推送实时识别文本 */
   onPartialText: (callback: (text: string) => void) => void
+  /** 渲染进程发送波形数据（用于指示器窗口可视化） */
+  sendWaveformData: (data: number[]) => void
+}
+
+/** 指示器窗口 preload 暴露的接口 */
+export interface IndicatorAPI {
+  /** 接收波形数据 */
+  onWaveformData: (callback: (data: number[]) => void) => void
+  /** 接收状态变化 */
+  onStatusChange: (callback: (status: string) => void) => void
 }
 
 declare global {
   interface Window {
     voicePipe: VoicePipeAPI
+    indicator: IndicatorAPI
   }
 }

@@ -54,4 +54,8 @@ contextBridge.exposeInMainWorld('voicePipe', {
   /** 主进程推送实时识别文本 */
   onPartialText: (callback: (text: string) => void) =>
     ipcRenderer.on('partial-text', (_event, text: string) => callback(text)),
+
+  /** 渲染进程发送波形数据（用于指示器窗口可视化） */
+  sendWaveformData: (data: number[]) =>
+    ipcRenderer.send('waveform-data', data),
 })

@@ -6,6 +6,7 @@ import { pasteText } from './paster'
 import { AsrStreamClient } from './asr-client'
 import { encodeWav } from './wav-encoder'
 import { getConfig, updateConfig } from './config'
+import { showIndicator, hideIndicator, sendWaveformToIndicator, sendStatusToIndicator } from './indicator'
 
 /** 禁用 GPU 加速（避免在 WSL 网络路径 / 远程桌面等环境下 GPU 进程崩溃） */
 app.disableHardwareAcceleration()
@@ -81,6 +82,15 @@ function setState(newState: AppState): void {
   state = newState
   updateTrayStatus(newState)
   mainWindow?.webContents.send('status-change', newState)
+
+  // 指示器窗口状态同步
+  if (newState === 'recording') {
+    showIndicator()
+  } else if (newState === 'processing') {
+    sendStatusToIndicator('processing')
+  } else if (newState === 'idle') {
+    hideIndicator()
+  }
 }
 
 /** 开始录音 */
@@ -94,10 +104,15 @@ function startRecording(): void {
   const config = getConfig()
   asrClient = new AsrStreamClient(config.asrUrl)
 
-  asrClient.on('text', (text: string) => {
-    // online 模式返回增量文本，需要累积拼接
+  asrClient.on('text', (text: string, _isFinal: boolean, mode: string) => {
     if (text) {
-      finalText += text
+      if (mode.endsWith('offline')) {
+        // 2pass-offline 纠错结果，直接覆盖
+        finalText = text
+      } else {
+        // 2pass-online / online 实时增量，累积拼接
+        finalText += text
+      }
     }
     // 实时推送累积的完整文本到渲染进程
     mainWindow?.webContents.send('partial-text', finalText)
@@ -200,6 +215,11 @@ function registerIpc(): void {
   // 实时接收 PCM chunk
   ipcMain.on('audio-chunk', (_event, data: ArrayBuffer) => {
     handleAudioChunk(data)
+  })
+
+  // 波形数据：主窗口渲染进程 → 指示器窗口
+  ipcMain.on('waveform-data', (_event, data: number[]) => {
+    sendWaveformToIndicator(data)
   })
 
   // 兼容旧的 complete-pcm（渲染进程停止时发送）
