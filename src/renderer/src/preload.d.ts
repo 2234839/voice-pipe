@@ -42,6 +42,14 @@ export interface VoicePipeAPI {
   clearHistory: () => void
   /** 主进程推送历史更新 */
   onHistoryUpdate: (callback: (entry: HistoryEntry) => void) => void
+  /** 获取全天候监听状态 */
+  getAlwaysOnStatus: () => Promise<boolean>
+  /** 切换全天候监听 */
+  toggleAlwaysOn: () => Promise<boolean>
+  /** 主进程通知开始全天候采集 */
+  onStartAlwaysOn: (callback: () => void) => void
+  /** 主进程通知停止全天候采集 */
+  onStopAlwaysOn: (callback: () => void) => void
 }
 
 /** 指示器窗口 preload 暴露的接口 */

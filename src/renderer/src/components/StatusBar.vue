@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * 状态指示栏
- * 显示当前状态（就绪/录音中/识别中）和设置按钮
+ * 显示当前状态（就绪/录音中/识别中）、全天候监听状态和设置按钮
  */
 import { computed } from 'vue'
 
@@ -11,6 +11,8 @@ const props = defineProps<{
   status: string
   /** 当前快捷键名称 */
   hotkey: string
+  /** 全天候监听是否开启 */
+  alwaysOn: boolean
 }>()
 
 /** 触发打开设置 */
@@ -34,13 +36,19 @@ const hintTexts: Record<string, string> = {
 
 /** 状态文案 */
 const statusLabel = computed(() => statusTexts[props.status] ?? props.status)
-const hintLabel = computed(() => hintTexts[props.status] ?? '')
+const hintLabel = computed(() => {
+  const hint = hintTexts[props.status] ?? ''
+  if (props.alwaysOn && props.status === 'idle') {
+    return `${hint} · 全天候监听中`
+  }
+  return hint
+})
 </script>
 
 <template>
   <div class="status-bar" :class="`status-${status}`">
     <div class="status-left">
-      <div class="status-dot" />
+      <div class="status-dot" :class="{ 'always-on': alwaysOn && status === 'idle' }" />
       <div class="status-info">
         <span class="status-label">{{ statusLabel }}</span>
         <span class="status-hint">{{ hintLabel }}</span>
@@ -81,6 +89,11 @@ const hintLabel = computed(() => hintTexts[props.status] ?? '')
 
 .status-idle .status-dot {
   background: #4ecca3;
+}
+
+.status-dot.always-on {
+  background: #3498db;
+  animation: pulse 2s ease-in-out infinite;
 }
 
 .status-recording .status-dot {

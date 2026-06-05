@@ -20,6 +20,8 @@ interface AppConfig {
   hotkey: string
   /** 热词列表 */
   hotwords: HotwordEntry[]
+  /** 全天候监听模式 */
+  alwaysOn: boolean
 }
 
 /** 配置默认值 */
@@ -28,6 +30,7 @@ const defaults: AppConfig = {
   notification: true,
   hotkey: 'RightAlt',
   hotwords: [],
+  alwaysOn: false,
 }
 
 /** 配置文件路径 */

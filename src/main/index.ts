@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { readFileSync, writeFileSync, existsSync } from 'fs'
-import { createTray, updateTrayStatus, destroyTray } from './tray'
+import { createTray, updateTrayStatus, destroyTray, updateAlwaysOnMenu } from './tray'
 import { startHotkey, stopHotkey, HOTKEY_MAP, captureKey } from './hotkey'
 import { pasteText } from './paster'
 import { AsrStreamClient } from './asr-client'
@@ -9,6 +9,7 @@ import { encodeWav } from './wav-encoder'
 import { getConfig, updateConfig } from './config'
 import { showIndicator, hideIndicator, sendWaveformToIndicator, sendStatusToIndicator, sendPartialTextToIndicator } from './indicator'
 import { getHistory, addHistoryEntry, clearHistory } from './history'
+import { startAlwaysOn, stopAlwaysOn, sendAlwaysOnChunk, isAlwaysOnActive, initAlwaysOn } from './always-on'
 
 /** 窗口位置持久化 */
 interface WindowBounds {
@@ -166,7 +167,6 @@ function startRecording(): void {
       // 2pass-offline: 当前分片的纠错文本，追加到 confirmedText
       confirmedText += text
       onlineText = ''
-      console.log(`[main] offline 追加后 confirmedText 长度: ${confirmedText.length}`)
     } else {
       // 2pass-online: 当前分片的实时累积文本
       onlineText = text
@@ -207,13 +207,9 @@ async function stopRecording(): Promise<void> {
   // 告诉 ASR 说话结束（触发最后一次 offline 纠错）
   asrClient?.finish()
 
-  // 如果有未纠错的 online 文本，等待 offline 纠错到达（最多 5 秒）
+  // 等待服务端返回 is_final=true（最终 2pass 纠错完成），最多 5 秒
   if (pendingOnline) {
-    for (let i = 0; i < 50; i++) {
-      // onlineText 被清空说明 offline 纠错已到达
-      if (!onlineText) break
-      await new Promise(resolve => setTimeout(resolve, 100))
-    }
+    await asrClient?.waitForFinal(5000)
   }
 
   asrClient?.close()
@@ -241,7 +237,7 @@ async function stopRecording(): Promise<void> {
   setState('idle')
 }
 
-/** 处理实时 PCM chunk：转发给 ASR + 缓存 */
+/** 处理实时 PCM chunk：转发给 ASR + 缓存 + 全天候转发 */
 function handleAudioChunk(data: ArrayBuffer): void {
   const chunk = Buffer.from(data)
 
@@ -250,12 +246,15 @@ function handleAudioChunk(data: ArrayBuffer): void {
 
   pcmBuffers.push(chunk)
 
-  // 实时转发给 ASR
+  // 实时转发给热键 ASR
   const STRIDE = 1920
   for (let offset = 0; offset < chunk.length; offset += STRIDE) {
     const sub = chunk.subarray(offset, Math.min(offset + STRIDE, chunk.length))
     asrClient?.sendChunk(sub)
   }
+
+  // 转发给全天候 ASR（独立连接）
+  sendAlwaysOnChunk(chunk)
 }
 
 /** Fallback 离线识别（当 online 模式失败时） */
@@ -340,6 +339,22 @@ function registerIpc(): void {
   ipcMain.on('clear-history', () => {
     clearHistory()
   })
+
+  /** 获取全天候监听状态 */
+  ipcMain.handle('get-always-on-status', () => isAlwaysOnActive())
+
+  /** 切换全天候监听 */
+  ipcMain.handle('toggle-always-on', () => {
+    if (isAlwaysOnActive()) {
+      stopAlwaysOn()
+      updateConfig({ alwaysOn: false })
+    } else {
+      const config = getConfig()
+      startAlwaysOn(config.asrUrl, config.hotwords)
+      updateConfig({ alwaysOn: true })
+    }
+    return isAlwaysOnActive()
+  })
 }
 
 /** 应用启动 */
@@ -347,6 +362,7 @@ app.whenReady().then(() => {
   createWindow()
   createTray(
     () => {
+      stopAlwaysOn()
       stopHotkey()
       destroyTray()
       app.quit()
@@ -355,9 +371,25 @@ app.whenReady().then(() => {
       mainWindow?.webContents.send('open-settings')
       mainWindow?.show()
     },
+    () => {
+      // 全天候监听切换
+      if (isAlwaysOnActive()) {
+        stopAlwaysOn()
+        updateConfig({ alwaysOn: false })
+        updateAlwaysOnMenu(false)
+      } else {
+        const cfg = getConfig()
+        startAlwaysOn(cfg.asrUrl, cfg.hotwords)
+        updateConfig({ alwaysOn: true })
+        updateAlwaysOnMenu(true)
+      }
+    },
   )
 
   registerIpc()
+
+  // 注册 always-on 的窗口获取器
+  initAlwaysOn(() => mainWindow)
 
   startHotkey(
     () => startRecording(),
@@ -365,10 +397,26 @@ app.whenReady().then(() => {
   )
 
   console.log('[main] VoicePipe 已启动')
+
+  // 如果配置中开启了全天候监听，等渲染进程就绪后自动启动
+  const config = getConfig()
+  if (config.alwaysOn && mainWindow) {
+    const startAlways = () => {
+      console.log('[main] 渲染进程就绪，启动全天候监听')
+      startAlwaysOn(config.asrUrl, config.hotwords)
+      updateAlwaysOnMenu(true)
+    }
+    if (mainWindow.webContents.isLoading()) {
+      mainWindow.webContents.once('did-finish-load', startAlways)
+    } else {
+      startAlways()
+    }
+  }
 })
 
 // 主窗口关闭时退出应用
 app.on('window-all-closed', () => {
+  stopAlwaysOn()
   stopHotkey()
   destroyTray()
   app.quit()

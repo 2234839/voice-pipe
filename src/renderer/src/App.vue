@@ -17,6 +17,9 @@ const audio = useAudio()
 /** 是否显示设置面板 */
 const showSettings = ref(false)
 
+/** 全天候监听状态 */
+const alwaysOn = ref(false)
+
 /** 当前快捷键名称 */
 const hotkeyName = computed(() => String(config.value.hotkey ?? 'RightAlt'))
 
@@ -39,6 +42,21 @@ onMounted(() => {
   window.voicePipe.onStartRecording(onStartRecording)
   window.voicePipe.onStopRecording(onStopRecording)
   window.addEventListener('open-settings', onOpenSettings)
+
+  // 获取全天候监听状态
+  window.voicePipe.getAlwaysOnStatus().then((active) => {
+    alwaysOn.value = active
+  })
+
+  // 全天候采集控制（独立于热键，共享麦克风）
+  window.voicePipe.onStartAlwaysOn(async () => {
+    alwaysOn.value = true
+    await audio.startAlwaysOn()
+  })
+  window.voicePipe.onStopAlwaysOn(() => {
+    alwaysOn.value = false
+    audio.stopAlwaysOn()
+  })
 })
 
 onUnmounted(() => {
@@ -59,6 +77,7 @@ onUnmounted(() => {
       <StatusBar
         :status="status"
         :hotkey="hotkeyName"
+        :always-on="alwaysOn"
         @open-settings="showSettings = true"
       />
       <PartialText :text="partialText" />

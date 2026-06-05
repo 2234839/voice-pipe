@@ -70,4 +70,20 @@ contextBridge.exposeInMainWorld('voicePipe', {
   /** 主进程推送历史更新 */
   onHistoryUpdate: (callback: (entry: { text: string; timestamp: number }) => void) =>
     ipcRenderer.on('history-update', (_event, entry: { text: string; timestamp: number }) => callback(entry)),
+
+  /** 获取全天候监听状态 */
+  getAlwaysOnStatus: () =>
+    ipcRenderer.invoke('get-always-on-status'),
+
+  /** 切换全天候监听 */
+  toggleAlwaysOn: () =>
+    ipcRenderer.invoke('toggle-always-on'),
+
+  /** 主进程通知开始全天候采集 */
+  onStartAlwaysOn: (callback: () => void) =>
+    ipcRenderer.on('start-always-on-cmd', () => callback()),
+
+  /** 主进程通知停止全天候采集 */
+  onStopAlwaysOn: (callback: () => void) =>
+    ipcRenderer.on('stop-always-on-cmd', () => callback()),
 })
