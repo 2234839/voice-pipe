@@ -5,50 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; media-src 'self' blob:" />
   <title>VoicePipe</title>
-  <link rel="stylesheet" href="./src/style.css" />
 </head>
 <body>
-  <div id="app">
-    <!-- 状态栏 -->
-    <div id="status-bar">
-      <div id="status-indicator" class="status-idle"></div>
-      <span id="status-text">就绪 — 按住 RightAlt 开始说话</span>
-    </div>
-
-    <!-- 音频可视化（录音时显示） -->
-    <div id="visualizer" class="hidden">
-      <canvas id="visualizer-canvas"></canvas>
-    </div>
-
-    <!-- 实时识别文本 -->
-    <div id="partial-text-container" class="hidden">
-      <p id="partial-text"></p>
-    </div>
-
-    <!-- 设置面板 -->
-    <div id="settings-panel" class="hidden">
-      <h2>设置</h2>
-      <div class="setting-item">
-        <label for="setting-hotkey">快捷键</label>
-        <div class="hotkey-capture-wrapper">
-          <input id="setting-hotkey" type="text" readonly value="RightAlt" placeholder="点击此处按下新快捷键..." />
-          <small id="hotkey-hint">点击输入框，然后按下你想设置的快捷键</small>
-        </div>
-      </div>
-      <div class="setting-item">
-        <label for="setting-asr-url">FunASR 地址</label>
-        <input id="setting-asr-url" type="text" value="ws://127.0.0.1:10095" />
-      </div>
-      <div class="setting-item">
-        <label for="setting-notification">显示通知</label>
-        <input id="setting-notification" type="checkbox" checked />
-      </div>
-      <div class="setting-actions">
-        <button id="btn-devtools" class="btn-secondary">开发者工具</button>
-        <button id="btn-save-settings">保存</button>
-      </div>
-    </div>
-  </div>
+  <div id="app"></div>
   <script type="module" src="./src/main.ts"></script>
 </body>
 </html>

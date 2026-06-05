@@ -10,10 +10,12 @@
     "noEmit": true,
     "outDir": "./out",
     "resolveJsonModule": true,
+    "jsx": "preserve",
     "lib": ["ESNext", "DOM", "DOM.Iterable"]
   },
   "include": [
     "src/renderer/**/*.ts",
-    "src/renderer/**/*.html"
+    "src/renderer/**/*.html",
+    "src/renderer/**/*.vue"
   ]
 }

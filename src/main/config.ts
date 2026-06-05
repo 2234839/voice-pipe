@@ -2,6 +2,14 @@ import { app } from 'electron'
 import { readFileSync, writeFileSync, existsSync } from 'fs'
 import { join } from 'path'
 
+/** 热词条目 */
+export interface HotwordEntry {
+  /** 热词文本 */
+  word: string
+  /** 权重 (1-100) */
+  weight: number
+}
+
 /** 应用配置 */
 interface AppConfig {
   /** ASR 服务 WebSocket 地址 */
@@ -10,6 +18,8 @@ interface AppConfig {
   notification: boolean
   /** 快捷键键码 */
   hotkey: string
+  /** 热词列表 */
+  hotwords: HotwordEntry[]
 }
 
 /** 配置默认值 */
@@ -17,6 +27,7 @@ const defaults: AppConfig = {
   asrUrl: 'ws://127.0.0.1:10095',
   notification: true,
   hotkey: 'RightAlt',
+  hotwords: [],
 }
 
 /** 配置文件路径 */
@@ -59,7 +70,9 @@ export function getConfig(): AppConfig {
 /** 更新配置项 */
 export function updateConfig(partial: Partial<AppConfig>): void {
   const config = ensureLoaded()
+  console.log(`[config] 更新前 hotwords: ${JSON.stringify(config.hotwords)}`)
   Object.assign(config, partial)
+  console.log(`[config] 更新后 hotwords: ${JSON.stringify(config.hotwords)}`)
   saveConfig(config)
 }
 

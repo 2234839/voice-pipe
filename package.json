@@ -13,12 +13,14 @@
   },
   "dependencies": {
     "uiohook-napi": "^1.5.5",
+    "vue": "^3.5.35",
     "ws": "^8.18.0"
   },
   "devDependencies": {
     "@electron/rebuild": "^3.7.0",
     "@types/node": "^25.9.1",
     "@types/ws": "^8.18.0",
+    "@vitejs/plugin-vue": "^6.0.7",
     "electron": "^35.0.0",
     "electron-builder": "^26.0.0",
     "electron-vite": "^3.0.0",

@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
+import { readFileSync, writeFileSync, existsSync } from 'fs'
 import { createTray, updateTrayStatus, destroyTray } from './tray'
 import { startHotkey, stopHotkey, HOTKEY_MAP, captureKey } from './hotkey'
 import { pasteText } from './paster'
@@ -7,6 +8,32 @@ import { AsrStreamClient } from './asr-client'
 import { encodeWav } from './wav-encoder'
 import { getConfig, updateConfig } from './config'
 import { showIndicator, hideIndicator, sendWaveformToIndicator, sendStatusToIndicator } from './indicator'
+import { getHistory, addHistoryEntry, clearHistory } from './history'
+
+/** 窗口位置持久化 */
+interface WindowBounds {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+/** 窗口位置文件路径 */
+function getBoundsPath(): string {
+  return join(app.getPath('userData'), 'window-bounds.json')
+}
+
+/** 加载窗口位置 */
+function loadBounds(): WindowBounds | null {
+  if (!existsSync(getBoundsPath())) return null
+  const raw = readFileSync(getBoundsPath(), 'utf-8')
+  return JSON.parse(raw) as WindowBounds
+}
+
+/** 保存窗口位置 */
+function saveBounds(bounds: WindowBounds): void {
+  writeFileSync(getBoundsPath(), JSON.stringify(bounds, null, 2), 'utf-8')
+}
 
 /** 禁用 GPU 加速（避免在 WSL 网络路径 / 远程桌面等环境下 GPU 进程崩溃） */
 app.disableHardwareAcceleration()
@@ -54,12 +81,16 @@ let finalText = ''
 
 /**
  * 创建主窗口
- * 隐藏的承载窗口，用于音频采集（需要 getUserMedia）
  */
 function createWindow(): BrowserWindow {
+  /** 从持久化文件恢复窗口位置 */
+  const savedBounds = loadBounds()
+
   mainWindow = new BrowserWindow({
-    width: 520,
-    height: 420,
+    width: savedBounds?.width ?? 520,
+    height: savedBounds?.height ?? 420,
+    x: savedBounds?.x,
+    y: savedBounds?.y,
     show: true,
     autoHideMenuBar: true,
     title: 'VoicePipe',
@@ -78,6 +109,13 @@ function createWindow(): BrowserWindow {
 
   mainWindow.on('closed', () => {
     mainWindow = null
+  })
+
+  // 窗口移动或缩放时保存位置
+  mainWindow.on('close', () => {
+    if (!mainWindow) return
+    const bounds = mainWindow.getBounds()
+    saveBounds(bounds)
   })
 
   // F12 打开/关闭开发者工具
@@ -114,9 +152,9 @@ function startRecording(): void {
   pcmBuffers = []
   finalText = ''
 
-  // 创建 ASR 流式客户端
+  // 创建 ASR 流式客户端，传入当前配置
   const config = getConfig()
-  asrClient = new AsrStreamClient(config.asrUrl)
+  asrClient = new AsrStreamClient(config.asrUrl, config.hotwords)
 
   asrClient.on('text', (text: string, _isFinal: boolean, mode: string) => {
     if (text) {
@@ -137,7 +175,6 @@ function startRecording(): void {
     console.log('[main] ASR 已连接，等待音频数据...')
   }).catch((err: Error) => {
     console.log(`[main] ASR 连接失败: ${err.message}`)
-    // 连接失败不影响录音，后续会用 fallback 离线识别
   })
 
   mainWindow?.webContents.send('start-recording-cmd')
@@ -173,6 +210,8 @@ async function stopRecording(): Promise<void> {
   if (finalText && finalText.trim()) {
     console.log(`[main] 最终结果: "${finalText}"`)
     await pasteText(finalText)
+    // 保存到历史记录
+    addHistoryEntry(finalText, mainWindow)
   } else {
     console.log('[main] 无识别结果')
   }
@@ -189,9 +228,7 @@ function handleAudioChunk(data: ArrayBuffer): void {
 
   pcmBuffers.push(chunk)
 
-  // 实时转发给 ASR（online 模式每 1920 字节一个 chunk）
-  // stride = 60 * chunk_size[1] / chunk_interval / 1000 * sample_rate * 2
-  //        = 60 * 10 / 10 / 1000 * 16000 * 2 = 1920
+  // 实时转发给 ASR
   const STRIDE = 1920
   for (let offset = 0; offset < chunk.length; offset += STRIDE) {
     const sub = chunk.subarray(offset, Math.min(offset + STRIDE, chunk.length))
@@ -212,11 +249,8 @@ async function fallbackOfflineAsr(): Promise<string> {
 
   console.log(`[main] 离线 fallback WAV: ${wav.byteLength} 字节`)
 
-  // 用临时的 offline 连接
   const config = getConfig()
-  const offlineClient = new AsrStreamClient(config.asrUrl)
-  // 暂时用简单方式：直接把完整 WAV 发送
-  // TODO: 如果需要可以恢复 transcribe 函数
+  const offlineClient = new AsrStreamClient(config.asrUrl, config.hotwords)
   offlineClient.close()
   return ''
 }
@@ -235,18 +269,19 @@ function registerIpc(): void {
   let waveformCount = 0
   ipcMain.on('waveform-data', (_event, data: number[]) => {
     waveformCount++
-    if (waveformCount <= 5) {
+    if (waveformCount <= 3) {
       console.log(`[main] 收到波形数据 #${waveformCount}: ${data.length} samples`)
     }
     sendWaveformToIndicator(data)
   })
 
-  // 兼容旧的 complete-pcm（渲染进程停止时发送）
+  // 兼容旧的 complete-pcm
   ipcMain.on('complete-pcm', (_event, data: ArrayBuffer) => {
     handleAudioChunk(data)
   })
 
   ipcMain.on('config-changed', (_event, config: Record<string, unknown>) => {
+    console.log(`[main] 收到配置更新: ${JSON.stringify(config)}`)
     updateConfig(config as Parameters<typeof updateConfig>[0])
   })
 
@@ -274,6 +309,14 @@ function registerIpc(): void {
   ipcMain.on('stop-key-capture', () => {
     cancelKeyCapture?.()
     cancelKeyCapture = null
+  })
+
+  /** 获取历史记录 */
+  ipcMain.handle('get-history', () => getHistory())
+
+  /** 清空历史记录 */
+  ipcMain.on('clear-history', () => {
+    clearHistory()
   })
 }
 

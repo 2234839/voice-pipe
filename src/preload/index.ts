@@ -58,4 +58,16 @@ contextBridge.exposeInMainWorld('voicePipe', {
   /** 渲染进程发送波形数据（用于指示器窗口可视化） */
   sendWaveformData: (data: number[]) =>
     ipcRenderer.send('waveform-data', data),
+
+  /** 获取历史记录 */
+  getHistory: () =>
+    ipcRenderer.invoke('get-history'),
+
+  /** 清空历史记录 */
+  clearHistory: () =>
+    ipcRenderer.send('clear-history'),
+
+  /** 主进程推送历史更新 */
+  onHistoryUpdate: (callback: (entry: { text: string; timestamp: number }) => void) =>
+    ipcRenderer.on('history-update', (_event, entry: { text: string; timestamp: number }) => callback(entry)),
 })

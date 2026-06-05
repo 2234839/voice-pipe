@@ -76,13 +76,16 @@ async function main() {
     fs.cpSync(path.join(ROOT, 'locales'), path.join(appDir, 'locales'), { recursive: true })
   }
 
-  // 复制 resources（图标等）
+  // 复制 resources（图标等）到 app 目录下，与 out 平级
   if (fs.existsSync(path.join(ROOT, 'resources'))) {
     const resFiles = fs.readdirSync(path.join(ROOT, 'resources'))
     if (resFiles.length > 0) {
-      const destRes = path.join(resourcesDir, 'resources')
-      if (!fs.existsSync(destRes)) fs.mkdirSync(destRes, { recursive: true })
-      fs.cpSync(path.join(ROOT, 'resources'), destRes, { recursive: true })
+      const appResDir = path.join(appDir, 'resources')
+      if (!fs.existsSync(appResDir)) fs.mkdirSync(appResDir, { recursive: true })
+      for (const file of resFiles) {
+        fs.copyFileSync(path.join(ROOT, 'resources', file), path.join(appResDir, file))
+        console.log(`  复制图标: ${file}`)
+      }
     }
   }
 

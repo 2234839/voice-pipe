@@ -1,3 +1,11 @@
+/** 历史记录条目 */
+export interface HistoryEntry {
+  /** 识别文本 */
+  text: string
+  /** 时间戳 (ms) */
+  timestamp: number
+}
+
 /** preload 暴露的 IPC 接口类型声明 */
 export interface VoicePipeAPI {
   /** 主进程通知开始录音 */
@@ -28,6 +36,12 @@ export interface VoicePipeAPI {
   onPartialText: (callback: (text: string) => void) => void
   /** 渲染进程发送波形数据（用于指示器窗口可视化） */
   sendWaveformData: (data: number[]) => void
+  /** 获取历史记录 */
+  getHistory: () => Promise<HistoryEntry[]>
+  /** 清空历史记录 */
+  clearHistory: () => void
+  /** 主进程推送历史更新 */
+  onHistoryUpdate: (callback: (entry: HistoryEntry) => void) => void
 }
 
 /** 指示器窗口 preload 暴露的接口 */

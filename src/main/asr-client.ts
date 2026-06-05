@@ -1,5 +1,6 @@
 import WebSocket from 'ws'
 import { EventEmitter } from 'events'
+import type { HotwordEntry } from './config'
 
 /** FunASR 服务端返回的原始消息 */
 interface FunASRMessage {
@@ -9,14 +10,14 @@ interface FunASRMessage {
 }
 
 /**
- * FunASR 流式识别客户端（online 模式）
+ * FunASR 流式识别客户端（2pass 模式）
  * 边发送音频边接收实时识别结果
  *
  * 核心机制：connect() 异步建立 WebSocket 连接，期间 sendChunk() 调用的数据
  * 会被缓存到 pendingChunks 中，连接建立后自动 flush 到服务端
  *
  * 用法：
- *   const client = new AsrStreamClient('ws://127.0.0.1:10095')
+ *   const client = new AsrStreamClient('ws://127.0.0.1:10095', hotwords)
  *   client.on('text', (text, isFinal) => { ... })
  *   client.connect()
  *   client.sendChunk(pcmBuffer)
@@ -25,14 +26,17 @@ interface FunASRMessage {
 export class AsrStreamClient extends EventEmitter {
   private ws: WebSocket | null = null
   private readonly wsUrl: string
+  /** 热词列表 */
+  private readonly hotwords: HotwordEntry[]
   /** 是否已收到最终结果 */
   private settled = false
   /** 连接建立前缓存的 PCM chunks */
   private pendingChunks: Buffer[] = []
 
-  constructor(wsUrl: string) {
+  constructor(wsUrl: string, hotwords: HotwordEntry[] = []) {
     super()
     this.wsUrl = wsUrl
+    this.hotwords = hotwords
   }
 
   /** 连接 FunASR 服务 */
@@ -53,6 +57,11 @@ export class AsrStreamClient extends EventEmitter {
         console.log('[asr] 已连接')
 
         // 发送控制消息：2pass 模式（实时 + 句尾离线纠错）
+        /** 序列化热词为 FunASR 要求的 JSON 字符串格式 */
+        const hotwordsStr = this.hotwords.length > 0
+          ? JSON.stringify(Object.fromEntries(this.hotwords.map(h => [h.word, h.weight])))
+          : ''
+
         const controlMsg = JSON.stringify({
           mode: '2pass',
           chunk_size: [5, 10, 5],
@@ -64,6 +73,7 @@ export class AsrStreamClient extends EventEmitter {
           wav_format: 'pcm',
           is_speaking: true,
           itn: true,
+          hotwords: hotwordsStr,
         })
         this.ws!.send(controlMsg)
 
