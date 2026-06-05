@@ -174,6 +174,7 @@ function startRecording(): void {
     // 实时推送: 已确认文本 + 当前正在识别的文本
     const fullText = confirmedText + onlineText
     mainWindow?.webContents.send('partial-text', fullText)
+    // 指示器显示完整文本，CSS 自动滚动到末尾
     sendPartialTextToIndicator(fullText)
   })
 
@@ -200,13 +201,19 @@ async function stopRecording(): Promise<void> {
   mainWindow?.webContents.send('stop-recording-cmd')
   console.log('[main] 停止录音')
 
-  // 告诉 ASR 说话结束
+  // 记住当前 onlineText，finish 后等待它被 offline 纠错替换
+  const pendingOnline = onlineText
+
+  // 告诉 ASR 说话结束（触发最后一次 offline 纠错）
   asrClient?.finish()
 
-  // 等待 ASR 最终结果（最多 10 秒）
-  for (let i = 0; i < 100; i++) {
-    if (getFullText()) break
-    await new Promise(resolve => setTimeout(resolve, 100))
+  // 如果有未纠错的 online 文本，等待 offline 纠错到达（最多 5 秒）
+  if (pendingOnline) {
+    for (let i = 0; i < 50; i++) {
+      // onlineText 被清空说明 offline 纠错已到达
+      if (!onlineText) break
+      await new Promise(resolve => setTimeout(resolve, 100))
+    }
   }
 
   asrClient?.close()
