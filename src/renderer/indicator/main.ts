@@ -29,6 +29,8 @@ window.indicator?.onWaveformData((data: number[]) => {
 window.indicator?.onPartialText((text: string) => {
   if (partialTextEl) {
     partialTextEl.textContent = text
+    // 文本超出宽度时自动滚动到末尾，始终显示最新内容
+    partialTextEl.scrollLeft = partialTextEl.scrollWidth
   }
 })
 
