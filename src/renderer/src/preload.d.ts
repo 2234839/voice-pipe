@@ -50,6 +50,8 @@ export interface IndicatorAPI {
   onWaveformData: (callback: (data: number[]) => void) => void
   /** 接收状态变化 */
   onStatusChange: (callback: (status: string) => void) => void
+  /** 接收实时识别文本 */
+  onPartialText: (callback: (text: string) => void) => void
 }
 
 declare global {

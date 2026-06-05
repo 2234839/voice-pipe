@@ -1,0 +1,40 @@
+# FunASR 2pass 流式语音识别服务
+# 中文语音识别（VAD + 实时流式 + 句尾纠错 + 标点 + ITN）
+#
+# 使用方法：
+#   docker compose up -d          启动服务
+#   docker compose logs -f        查看日志
+#   docker compose down           停止服务
+#
+# 首次启动会自动下载模型（约 2-3 GB），之后秒启
+# 服务就绪后，WebSocket 端口：ws://localhost:10095
+
+services:
+  funasr:
+    image: registry.cn-hangzhou.aliyuncs.com/funasr_repo/funasr:funasr-runtime-sdk-online-cpu-0.1.13
+    container_name: funasr-server
+    ports:
+      - "10095:10095"
+    privileged: true
+    volumes:
+      # 模型缓存（避免每次重新下载）
+      - ./models:/workspace/models
+    entrypoint: ["bash", "-c"]
+    command:
+      - |
+        set -e
+        echo "=== FunASR 2pass 流式识别服务启动中 ==="
+        cd /workspace/FunASR/runtime
+        bash run_server_2pass.sh \
+          --download-model-dir /workspace/models \
+          --vad-dir damo/speech_fsmn_vad_zh-cn-16k-common-onnx \
+          --model-dir damo/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-onnx \
+          --online-model-dir damo/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-online-onnx \
+          --punc-dir damo/punc_ct-transformer_zh-cn-common-vad_realtime-vocab272727-onnx \
+          --lm-dir damo/speech_ngram_lm_zh-cn-ai-wesp-fst \
+          --itn-dir thuduj12/fst_itn_zh \
+          --hotword /workspace/models/hotwords.txt \
+          --certfile 0
+        echo "=== FunASR 2pass 服务已启动 ==="
+        tail -f /dev/null
+    restart: unless-stopped

@@ -7,7 +7,7 @@ import { pasteText } from './paster'
 import { AsrStreamClient } from './asr-client'
 import { encodeWav } from './wav-encoder'
 import { getConfig, updateConfig } from './config'
-import { showIndicator, hideIndicator, sendWaveformToIndicator, sendStatusToIndicator } from './indicator'
+import { showIndicator, hideIndicator, sendWaveformToIndicator, sendStatusToIndicator, sendPartialTextToIndicator } from './indicator'
 import { getHistory, addHistoryEntry, clearHistory } from './history'
 
 /** 窗口位置持久化 */
@@ -76,8 +76,10 @@ let asrClient: AsrStreamClient | null = null
 /** PCM 缓冲（用于最终 fallback 离线识别） */
 let pcmBuffers: Buffer[] = []
 
-/** 最终识别文本（用于粘贴） */
-let finalText = ''
+/** 已确认的离线纠错文本（多句累积） */
+let confirmedText = ''
+/** 当前句子在线实时文本 */
+let onlineText = ''
 
 /**
  * 创建主窗口
@@ -150,24 +152,29 @@ function startRecording(): void {
   if (state !== 'idle') return
   setState('recording')
   pcmBuffers = []
-  finalText = ''
+  confirmedText = ''
+  onlineText = ''
 
   // 创建 ASR 流式客户端，传入当前配置
   const config = getConfig()
   asrClient = new AsrStreamClient(config.asrUrl, config.hotwords)
 
   asrClient.on('text', (text: string, _isFinal: boolean, mode: string) => {
-    if (text) {
-      if (mode.endsWith('offline')) {
-        // 2pass-offline 纠错结果，直接覆盖
-        finalText = text
-      } else {
-        // 2pass-online / online 实时增量，累积拼接
-        finalText += text
-      }
+    if (!text) return
+
+    if (mode.endsWith('offline')) {
+      // 2pass-offline: 当前分片的纠错文本，追加到 confirmedText
+      confirmedText += text
+      onlineText = ''
+      console.log(`[main] offline 追加后 confirmedText 长度: ${confirmedText.length}`)
+    } else {
+      // 2pass-online: 当前分片的实时累积文本
+      onlineText = text
     }
-    // 实时推送累积的完整文本到渲染进程
-    mainWindow?.webContents.send('partial-text', finalText)
+    // 实时推送: 已确认文本 + 当前正在识别的文本
+    const fullText = confirmedText + onlineText
+    mainWindow?.webContents.send('partial-text', fullText)
+    sendPartialTextToIndicator(fullText)
   })
 
   // 连接 ASR 服务（不 await，录音可以立即开始）
@@ -179,6 +186,11 @@ function startRecording(): void {
 
   mainWindow?.webContents.send('start-recording-cmd')
   console.log('[main] 开始录音')
+}
+
+/** 获取当前完整识别文本（已确认 + 在线实时） */
+function getFullText(): string {
+  return confirmedText + onlineText
 }
 
 /** 停止录音并完成识别 */
@@ -193,25 +205,28 @@ async function stopRecording(): Promise<void> {
 
   // 等待 ASR 最终结果（最多 10 秒）
   for (let i = 0; i < 100; i++) {
-    if (finalText) break
+    if (getFullText()) break
     await new Promise(resolve => setTimeout(resolve, 100))
   }
 
   asrClient?.close()
   asrClient = null
 
+  let result = getFullText()
+  console.log(`[main] stopRecording: confirmedText="${confirmedText}", onlineText="${onlineText}"`)
+
   // 如果 online 模式没拿到结果，尝试用收集的 PCM fallback 离线识别
-  if (!finalText && pcmBuffers.length > 0) {
+  if (!result && pcmBuffers.length > 0) {
     console.log('[main] online 模式无结果，尝试离线 fallback')
-    finalText = await fallbackOfflineAsr()
+    result = await fallbackOfflineAsr()
   }
 
   // 粘贴最终文本
-  if (finalText && finalText.trim()) {
-    console.log(`[main] 最终结果: "${finalText}"`)
-    await pasteText(finalText)
+  if (result && result.trim()) {
+    console.log(`[main] 最终结果: "${result}"`)
+    await pasteText(result)
     // 保存到历史记录
-    addHistoryEntry(finalText, mainWindow)
+    addHistoryEntry(result, mainWindow)
   } else {
     console.log('[main] 无识别结果')
   }

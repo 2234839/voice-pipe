@@ -22,8 +22,8 @@ export function showIndicator(): void {
   const primaryDisplay = screen.getPrimaryDisplay()
   const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize
 
-  const winWidth = 200
-  const winHeight = 48
+  const winWidth = 360
+  const winHeight = 72
 
   indicatorWindow = new BrowserWindow({
     width: winWidth,
@@ -106,6 +106,12 @@ export function sendWaveformToIndicator(data: number[]): void {
     console.log(`[indicator] 发送波形数据 #${waveformSendCount} 到窗口 id=${indicatorWindow.id}, isLoading=${indicatorWindow.webContents.isLoading()}`)
   }
   indicatorWindow.webContents.send('waveform-data', data)
+}
+
+/** 向指示器窗口发送实时识别文本 */
+export function sendPartialTextToIndicator(text: string): void {
+  if (!indicatorWindow) return
+  indicatorWindow.webContents.send('indicator-partial-text', text)
 }
 
 /** 通知指示器窗口状态变化 */

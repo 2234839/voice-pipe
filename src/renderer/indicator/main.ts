@@ -3,11 +3,10 @@ import { initWaveform, updateWaveform } from './waveform-renderer'
 
 const waveformSvg = document.querySelector<SVGSVGElement>('#waveform-svg')
 const processingLabel = document.getElementById('processing-label')
+const partialTextEl = document.getElementById('partial-text')
 const indicator = document.getElementById('indicator')
 
 console.log(`[indicator-renderer] 初始化`)
-console.log(`[indicator-renderer] waveformSvg: ${waveformSvg ? 'found' : 'NULL'}`)
-console.log(`[indicator-renderer] window.indicator: ${window.indicator ? 'exists' : 'UNDEFINED'}`)
 
 if (waveformSvg) {
   initWaveform(waveformSvg)
@@ -26,11 +25,19 @@ window.indicator?.onWaveformData((data: number[]) => {
   }
 })
 
+// 接收实时识别文本
+window.indicator?.onPartialText((text: string) => {
+  if (partialTextEl) {
+    partialTextEl.textContent = text
+  }
+})
+
 // 接收状态变化
 window.indicator?.onStatusChange((status: string) => {
   console.log(`[indicator-renderer] 状态变化: ${status}`)
   if (status === 'processing') {
     waveformSvg?.classList.add('hidden')
+    partialTextEl?.classList.add('hidden')
     processingLabel?.classList.remove('hidden')
   } else if (status === 'idle') {
     indicator?.classList.add('fade-out')
