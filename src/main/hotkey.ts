@@ -89,6 +89,15 @@ export function stopHotkey(): void {
   onKeyUp = null
 }
 
+/** 重置按键状态并重新注册钩子（用于系统休眠/锁屏恢复后） */
+export function restartHotkey(keydownFn: KeyCallback, keyupFn: KeyCallback): void {
+  console.log('[hotkey] restartHotkey: 重置钩子...')
+  stopHotkey()
+  keyIsDown = false
+  startHotkey(keydownFn, keyupFn)
+  console.log('[hotkey] restartHotkey: 钩子已重建')
+}
+
 /** 临时监听任意按键（用于设置界面捕获用户按下的键） */
 export function captureKey(callback: (keyName: string) => void): () => void {
   const handler = (event: UiohookKeyboardEvent) => {

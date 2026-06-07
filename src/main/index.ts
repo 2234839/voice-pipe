@@ -1,8 +1,8 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, ipcMain, powerMonitor } from 'electron'
 import { join } from 'path'
 import { readFileSync, writeFileSync, existsSync } from 'fs'
 import { createTray, updateTrayStatus, destroyTray, updateAlwaysOnMenu } from './tray'
-import { startHotkey, stopHotkey, HOTKEY_MAP, captureKey } from './hotkey'
+import { startHotkey, stopHotkey, restartHotkey, HOTKEY_MAP, captureKey } from './hotkey'
 import { pasteText } from './paster'
 import { AsrStreamClient } from './asr-client'
 import { encodeWav } from './wav-encoder'
@@ -396,10 +396,22 @@ app.whenReady().then(() => {
     () => stopRecording(),
   )
 
+  /** 系统休眠/锁屏恢复后重新注册快捷键钩子 */
+  powerMonitor.on('resume', () => {
+    console.log('[main] 系统从休眠恢复，重新注册快捷键')
+    restartHotkey(() => startRecording(), () => stopRecording())
+  }) 
+
+  powerMonitor.on('unlock-screen', () => {
+    console.log('[main] 屏幕解锁，重新注册快捷键')
+    restartHotkey(() => startRecording(), () => stopRecording())
+  })
+
   console.log('[main] VoicePipe 已启动')
 
   // 如果配置中开启了全天候监听，等渲染进程就绪后自动启动
   const config = getConfig()
+  console.log(`[main] 配置: alwaysOn=${config.alwaysOn}, mainWindow=${!!mainWindow}, isLoading=${mainWindow?.webContents.isLoading()}`)
   if (config.alwaysOn && mainWindow) {
     const startAlways = () => {
       console.log('[main] 渲染进程就绪，启动全天候监听')

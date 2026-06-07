@@ -23,6 +23,9 @@ interface AlwaysOnRecord {
 /** 全天候 ASR 客户端 */
 let alwaysOnClient: AsrStreamClient | null = null
 
+/** 诊断：记录是否曾发送过 PCM */
+let hasEverSentChunk = false
+
 /** 全天候模式是否运行中 */
 let isActive = false
 
@@ -66,6 +69,7 @@ export function startAlwaysOn(asrUrl: string, hotwords: HotwordEntry[] = []): vo
 
   console.log('[always-on] 启动全天候监听')
 
+  hasEverSentChunk = false
   alwaysOnClient = new AsrStreamClient(asrUrl, hotwords, true)
 
   alwaysOnClient.on('text', (text: string, isFinal: boolean, mode: string) => {
@@ -120,6 +124,11 @@ export function stopAlwaysOn(): void {
 /** 转发 PCM chunk 给全天候 ASR 客户端 */
 export function sendAlwaysOnChunk(data: Buffer): void {
   if (!isActive || !alwaysOnClient) return
+
+  if (!hasEverSentChunk) {
+    hasEverSentChunk = true
+    console.log(`[always-on] 首次转发 PCM: ${data.length} bytes, client=${alwaysOnClient ? 'exists' : 'null'}`)
+  }
 
   const STRIDE = 1920
   for (let offset = 0; offset < data.length; offset += STRIDE) {
