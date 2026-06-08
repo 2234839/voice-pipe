@@ -1,4 +1,5 @@
 import { uIOhook, UiohookKey, UiohookKeyboardEvent } from 'uiohook-napi'
+import { powerMonitor } from 'electron'
 import { get } from './config'
 
 /** 按键事件回调 */
@@ -96,6 +97,44 @@ export function restartHotkey(keydownFn: KeyCallback, keyupFn: KeyCallback): voi
   keyIsDown = false
   startHotkey(keydownFn, keyupFn)
   console.log('[hotkey] restartHotkey: 钩子已重建')
+}
+
+/** 看门狗轮询间隔（ms） */
+const WATCHDOG_INTERVAL = 3000
+/** getSystemIdleState 阈值（秒） */
+const IDLE_THRESHOLD = 2
+
+/** 上一次的空闲状态 */
+let lastIdleState: string = 'active'
+/** 轮询定时器 */
+let watchdogTimer: ReturnType<typeof setInterval> | null = null
+/** 保存回调引用（watchdog 重启钩子时需要） */
+let savedKeydown: KeyCallback | null = null
+let savedKeyup: KeyCallback | null = null
+
+/** 启动快捷键健康看门狗：检测用户从空闲恢复活跃时自动重启钩子 */
+export function startHotkeyWatchdog(keydownFn: KeyCallback, keyupFn: KeyCallback): void {
+  savedKeydown = keydownFn
+  savedKeyup = keyupFn
+  lastIdleState = powerMonitor.getSystemIdleState(IDLE_THRESHOLD)
+
+  watchdogTimer = setInterval(() => {
+    const currentState = powerMonitor.getSystemIdleState(IDLE_THRESHOLD)
+
+    if (currentState !== lastIdleState) {
+      console.log(`[hotkey] 空闲状态变化: ${lastIdleState} -> ${currentState}`)
+
+      /** 从非活跃状态恢复到活跃：重启钩子 */
+      if (currentState === 'active' && (lastIdleState === 'idle' || lastIdleState === 'locked')) {
+        console.log('[hotkey] 用户恢复活跃，重新注册快捷键钩子')
+        restartHotkey(savedKeydown!, savedKeyup!)
+      }
+
+      lastIdleState = currentState
+    }
+  }, WATCHDOG_INTERVAL)
+
+  console.log('[hotkey] 看门狗已启动')
 }
 
 /** 临时监听任意按键（用于设置界面捕获用户按下的键） */

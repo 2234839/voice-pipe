@@ -1,8 +1,8 @@
-import { app, BrowserWindow, ipcMain, powerMonitor } from 'electron'
+import { app, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { readFileSync, writeFileSync, existsSync } from 'fs'
 import { createTray, updateTrayStatus, destroyTray, updateAlwaysOnMenu } from './tray'
-import { startHotkey, stopHotkey, restartHotkey, HOTKEY_MAP, captureKey } from './hotkey'
+import { startHotkey, stopHotkey, startHotkeyWatchdog, HOTKEY_MAP, captureKey } from './hotkey'
 import { pasteText } from './paster'
 import { AsrStreamClient } from './asr-client'
 import { encodeWav } from './wav-encoder'
@@ -396,16 +396,11 @@ app.whenReady().then(() => {
     () => stopRecording(),
   )
 
-  /** 系统休眠/锁屏恢复后重新注册快捷键钩子 */
-  powerMonitor.on('resume', () => {
-    console.log('[main] 系统从休眠恢复，重新注册快捷键')
-    restartHotkey(() => startRecording(), () => stopRecording())
-  }) 
-
-  powerMonitor.on('unlock-screen', () => {
-    console.log('[main] 屏幕解锁，重新注册快捷键')
-    restartHotkey(() => startRecording(), () => stopRecording())
-  })
+  /** 看门狗：检测用户从空闲恢复活跃时自动重启快捷键钩子 */
+  startHotkeyWatchdog(
+    () => startRecording(),
+    () => stopRecording(),
+  )
 
   console.log('[main] VoicePipe 已启动')
 
