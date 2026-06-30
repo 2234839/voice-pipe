@@ -1,6 +1,6 @@
 {
   "name": "voice-pipe",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Windows 语音输入工具 — 按住快捷键说话，松开自动粘贴文字",
   "main": "./out/main/index.js",
   "private": true,
